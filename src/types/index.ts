@@ -1,5 +1,8 @@
 export type WaybillStatus = 'in_transit' | 'delivered' | 'exception';
 export type RiskLevel = 'compliant' | 'minor' | 'severe';
+export type TicketStatus = 'pending' | 'in_progress' | 'resolved' | 'escalated';
+export type TicketPriority = 'low' | 'medium' | 'high';
+export type VersionPurpose = 'customer_query' | 'audit' | 'complaint' | 'insurance' | 'other';
 
 export interface Waybill {
   id: string;
@@ -112,6 +115,58 @@ export interface CustomerSummary {
   conclusion: string;
 }
 
+export interface DisputeTicket {
+  id: string;
+  waybillId: string;
+  waybillIdDisplay: string;
+  customerName: string;
+  riskLevel: RiskLevel;
+  status: TicketStatus;
+  priority: TicketPriority;
+  assignee: string;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  description: string;
+  resolution?: string;
+  followUpDate?: string;
+  tags: string[];
+}
+
+export interface CertificateVersion {
+  id: string;
+  waybillId: string;
+  versionNumber: number;
+  createdAt: string;
+  createdBy: string;
+  purpose: VersionPurpose;
+  customNote?: string;
+  selectedSegmentIds: string[];
+  summarySnapshot: CustomerSummary;
+}
+
+export interface CustomerExceptionSummary {
+  customerName: string;
+  totalWaybills: number;
+  totalAlerts: number;
+  severeAlerts: number;
+  minorAlerts: number;
+  last30DaysWaybills: number;
+  last30DaysAlerts: number;
+  complianceRateAvg: number;
+  riskWaybills: string[];
+  latestExceptionDate: string;
+}
+
+export interface SearchFilters {
+  waybillId: string;
+  customerName: string;
+  shipmentDate: string;
+  riskLevel: RiskLevel | 'all';
+  ticketStatus: TicketStatus | 'all';
+  viewMode: 'waybill' | 'ticket';
+}
+
 export interface AppState {
   waybills: Waybill[];
   selectedWaybill: Waybill | null;
@@ -125,6 +180,11 @@ export interface AppState {
   certificateSegments: CertificateSegment[];
   customerSummary: CustomerSummary | null;
   searchFilters: SearchFilters;
+  disputeTickets: DisputeTicket[];
+  certificateVersions: CertificateVersion[];
+  customerSummaries: CustomerExceptionSummary[];
+  selectedTicketId: string | null;
+  selectedVersionId: string | null;
   setSelectedWaybill: (waybill: Waybill | null) => void;
   setSelectedAlertId: (id: string | null) => void;
   setSelectedTimelineEventId: (id: string | null) => void;
@@ -135,8 +195,16 @@ export interface AppState {
   resetSearchFilters: () => void;
   loadWaybillData: (waybillId: string) => void;
   generateCustomerSummary: () => void;
+  generateSegmentBasedSummary: () => void;
   getFilteredWaybills: () => Waybill[];
   getAlertById: (id: string) => AlertRecord | undefined;
   getHandlingActionByAlertId: (alertId: string) => HandlingAction | undefined;
   getSignatureNodesByWaybillId: (waybillId: string) => SignatureNode[];
+  createDisputeTicket: (ticket: Omit<DisputeTicket, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateDisputeTicket: (id: string, updates: Partial<DisputeTicket>) => void;
+  getFilteredTickets: () => DisputeTicket[];
+  saveCertificateVersion: (purpose: VersionPurpose, customNote?: string) => void;
+  getVersionsByWaybillId: (waybillId: string) => CertificateVersion[];
+  restoreCertificateVersion: (versionId: string) => void;
+  getCustomerExceptionSummary: (customerName: string) => CustomerExceptionSummary | undefined;
 }

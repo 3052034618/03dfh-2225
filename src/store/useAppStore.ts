@@ -1,9 +1,22 @@
 import { create } from 'zustand';
-import type { AppState, Waybill, CertificateSegment } from '@/types';
+import type {
+  AppState,
+  Waybill,
+  CertificateSegment,
+  DisputeTicket,
+  CertificateVersion,
+  VersionPurpose,
+  AlertRecord,
+} from '@/types';
 import { mockWaybills } from '@/data/mockWaybills';
 import { getTemperaturesByWaybillId } from '@/data/mockTemperatures';
 import { getEventsByWaybillId, getHandlingActionsByWaybillId, getSignatureNodesByWaybillId } from '@/data/mockEvents';
 import { getAlertRecordsByWaybillId } from '@/data/mockAlerts';
+import {
+  mockTickets,
+  mockVersions,
+  mockCustomerSummaries,
+} from '@/data/mockTickets';
 import { formatDateTime } from '@/utils/format';
 import { generateCustomerSummary } from '@/utils/summary';
 
@@ -77,11 +90,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedTimelineEventId: null,
   certificateSegments: [],
   customerSummary: null,
+  disputeTickets: mockTickets,
+  certificateVersions: mockVersions,
+  customerSummaries: mockCustomerSummaries,
+  selectedTicketId: null,
+  selectedVersionId: null,
   searchFilters: {
     waybillId: '',
     customerName: '',
     shipmentDate: '',
     riskLevel: 'all',
+    ticketStatus: 'all',
+    viewMode: 'waybill',
   },
 
   setSelectedWaybill: (waybill: Waybill | null) => {
@@ -106,6 +126,50 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ customerSummary: summary });
   },
 
+  generateSegmentBasedSummary: () => {
+    const { selectedWaybill, alertRecords, handlingActions, certificateSegments } = get();
+    if (!selectedWaybill) return;
+
+    const selectedSegmentIds = certificateSegments.filter((s) => s.selected).map((s) => s.id);
+
+    const hasTemperatureSegment = selectedSegmentIds.includes('seg-full');
+    const selectedAlertSegments = selectedSegmentIds.filter((id) => id.startsWith('seg-alert-'));
+
+    let filteredAlerts: AlertRecord[] = [];
+    if (hasTemperatureSegment) {
+      filteredAlerts = alertRecords;
+    } else {
+      selectedAlertSegments.forEach((segId) => {
+        const index = parseInt(segId.replace('seg-alert-', ''), 10) - 1;
+        if (alertRecords[index]) {
+          filteredAlerts.push(alertRecords[index]);
+        }
+      });
+    }
+
+    const baseWaybill = {
+      ...selectedWaybill,
+      alertCount: filteredAlerts.length,
+      complianceRate: filteredAlerts.length === 0
+        ? 100
+        : hasTemperatureSegment
+        ? selectedWaybill.complianceRate
+        : Math.max(95, selectedWaybill.complianceRate + (alertRecords.length - filteredAlerts.length) * 1.5),
+    };
+
+    const summary = generateCustomerSummary(baseWaybill, filteredAlerts, handlingActions);
+
+    if (!hasTemperatureSegment && filteredAlerts.length === 0) {
+      summary.conclusion = `尊敬的${selectedWaybill.customerName}客户，您好！您关注的本次运输环节（${certificateSegments.filter(s => s.selected).map(s => s.title).join('、')}）经核查无温度异常，相关记录完整，货物品质有保障。`;
+      summary.isFullyCompliant = true;
+    } else if (filteredAlerts.length === 0) {
+      summary.conclusion = `尊敬的${selectedWaybill.customerName}客户，您好！根据您选择的记录范围，未包含温度异常片段，所选${certificateSegments.filter(s => s.selected).length > 1 ? '各环节' : '环节'}温度均在要求范围内。`;
+      summary.isFullyCompliant = true;
+    }
+
+    set({ customerSummary: summary });
+  },
+
   setSearchFilters: (filters) => {
     set((state) => ({
       searchFilters: { ...state.searchFilters, ...filters },
@@ -113,11 +177,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   toggleSegment: (id: string) => {
-    set((state) => ({
-      certificateSegments: state.certificateSegments.map((seg) =>
+    set((state) => {
+      const newSegments = state.certificateSegments.map((seg) =>
         seg.id === id ? { ...seg, selected: !seg.selected } : seg
-      ),
-    }));
+      );
+      return { certificateSegments: newSegments };
+    });
+    setTimeout(() => {
+      get().generateSegmentBasedSummary();
+    }, 0);
   },
 
   selectAllSegments: () => {
@@ -127,6 +195,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         selected: true,
       })),
     }));
+    setTimeout(() => {
+      get().generateCustomerSummary();
+    }, 0);
   },
 
   clearSegments: () => {
@@ -136,6 +207,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         selected: false,
       })),
     }));
+    setTimeout(() => {
+      get().generateSegmentBasedSummary();
+    }, 0);
   },
 
   resetSearchFilters: () => {
@@ -145,6 +219,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         customerName: '',
         shipmentDate: '',
         riskLevel: 'all',
+        ticketStatus: 'all',
+        viewMode: 'waybill',
       },
     });
   },
@@ -203,5 +279,94 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   getSignatureNodesByWaybillId: (waybillId: string) => {
     return get().signatureNodes.filter((s) => s.waybillId === waybillId);
+  },
+
+  createDisputeTicket: (ticketData) => {
+    const newTicket: DisputeTicket = {
+      ...ticketData,
+      id: `T${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    set((state) => ({
+      disputeTickets: [newTicket, ...state.disputeTickets],
+    }));
+  },
+
+  updateDisputeTicket: (id: string, updates: Partial<DisputeTicket>) => {
+    set((state) => ({
+      disputeTickets: state.disputeTickets.map((t) =>
+        t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
+      ),
+    }));
+  },
+
+  getFilteredTickets: () => {
+    const { disputeTickets, searchFilters } = get();
+    return disputeTickets.filter((ticket) => {
+      const matchesId = searchFilters.waybillId
+        ? ticket.waybillId.toLowerCase().includes(searchFilters.waybillId.toLowerCase())
+        : true;
+      const matchesCustomer = searchFilters.customerName
+        ? ticket.customerName.toLowerCase().includes(searchFilters.customerName.toLowerCase())
+        : true;
+      const matchesRisk = searchFilters.riskLevel && searchFilters.riskLevel !== 'all'
+        ? ticket.riskLevel === searchFilters.riskLevel
+        : true;
+      const matchesStatus = searchFilters.ticketStatus && searchFilters.ticketStatus !== 'all'
+        ? ticket.status === searchFilters.ticketStatus
+        : true;
+      return matchesId && matchesCustomer && matchesRisk && matchesStatus;
+    });
+  },
+
+  saveCertificateVersion: (purpose: VersionPurpose, customNote?: string) => {
+    const { selectedWaybill, certificateSegments, customerSummary, certificateVersions } = get();
+    if (!selectedWaybill || !customerSummary) return;
+
+    const waybillVersions = certificateVersions.filter((v) => v.waybillId === selectedWaybill.id);
+    const nextVersionNumber = waybillVersions.length > 0
+      ? Math.max(...waybillVersions.map((v) => v.versionNumber)) + 1
+      : 1;
+
+    const newVersion: CertificateVersion = {
+      id: `V${Date.now()}`,
+      waybillId: selectedWaybill.id,
+      versionNumber: nextVersionNumber,
+      createdAt: new Date().toISOString(),
+      createdBy: '当前客服',
+      purpose,
+      customNote,
+      selectedSegmentIds: certificateSegments.filter((s) => s.selected).map((s) => s.id),
+      summarySnapshot: JSON.parse(JSON.stringify(customerSummary)),
+    };
+
+    set((state) => ({
+      certificateVersions: [newVersion, ...state.certificateVersions],
+    }));
+  },
+
+  getVersionsByWaybillId: (waybillId: string) => {
+    return get().certificateVersions.filter((v) => v.waybillId === waybillId);
+  },
+
+  restoreCertificateVersion: (versionId: string) => {
+    const { certificateVersions, certificateSegments } = get();
+    const version = certificateVersions.find((v) => v.id === versionId);
+    if (!version) return;
+
+    const newSegments = certificateSegments.map((seg) => ({
+      ...seg,
+      selected: version.selectedSegmentIds.includes(seg.id),
+    }));
+
+    set({
+      certificateSegments: newSegments,
+      customerSummary: version.summarySnapshot,
+    });
+  },
+
+  getCustomerExceptionSummary: (customerName: string) => {
+    return get().customerSummaries.find((c) => c.customerName === customerName);
   },
 }));

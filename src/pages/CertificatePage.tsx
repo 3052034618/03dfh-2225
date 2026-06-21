@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { SegmentSelector } from '@/components/SegmentSelector';
 import { CertificatePreview } from '@/components/CertificatePreview';
+import { SaveVersionModal } from '@/components/SaveVersionModal';
+import { VersionHistoryPanel } from '@/components/VersionHistoryPanel';
 import { useAppStore } from '@/store/useAppStore';
 import {
   ArrowLeft,
@@ -13,6 +15,8 @@ import {
   AlertTriangle,
   ShieldCheck,
   MessageSquare,
+  Save,
+  History,
 } from 'lucide-react';
 import { formatPercentage } from '@/utils/format';
 import { generateSummaryScript } from '@/utils/summary';
@@ -26,6 +30,8 @@ export const CertificatePage = () => {
   const customerSummary = useAppStore((state) => state.customerSummary);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showFullScript, setShowFullScript] = useState(false);
+  const [showSaveVersion, setShowSaveVersion] = useState(false);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -84,7 +90,22 @@ export const CertificatePage = () => {
             勾选需要展示的片段，系统将自动生成温度留痕摘要并脱敏敏感信息
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            className="btn-secondary"
+            onClick={() => setShowVersionHistory(!showVersionHistory)}
+          >
+            <History className="w-4 h-4 mr-2" />
+            {showVersionHistory ? '隐藏历史版本' : '历史版本'}
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={() => setShowSaveVersion(true)}
+            disabled={selectedCount === 0}
+          >
+            <Save className="w-4 h-4 mr-2" />
+            保存版本
+          </button>
           <button
             className="btn-secondary"
             onClick={handlePrint}
@@ -258,6 +279,12 @@ export const CertificatePage = () => {
         </div>
       )}
 
+      {showVersionHistory && selectedWaybill && (
+        <div className="mb-6">
+          <VersionHistoryPanel waybillId={selectedWaybill.id} />
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <SegmentSelector />
@@ -268,6 +295,12 @@ export const CertificatePage = () => {
           </div>
         </div>
       </div>
+
+      <SaveVersionModal
+        isOpen={showSaveVersion}
+        onClose={() => setShowSaveVersion(false)}
+        currentSegmentCount={selectedCount}
+      />
     </div>
   );
 };

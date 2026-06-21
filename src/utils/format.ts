@@ -161,3 +161,53 @@ export const getRiskLevelColor = (level: string): string => {
   };
   return colorMap[level] || '#64748B';
 };
+
+export const formatTicketStatus = (status: string): string => {
+  const statusMap: Record<string, string> = {
+    pending: '待跟进',
+    in_progress: '处理中',
+    resolved: '已解决',
+    escalated: '已升级',
+    all: '全部工单',
+  };
+  return statusMap[status] || status;
+};
+
+export const getTicketStatusBadgeClass = (status: string): string => {
+  const classMap: Record<string, string> = {
+    pending: 'badge-warning',
+    in_progress: 'badge-info',
+    resolved: 'badge-success',
+    escalated: 'badge-danger',
+  };
+  return classMap[status] || 'badge-info';
+};
+
+export const formatTicketPriority = (priority: string): string => {
+  const priorityMap: Record<string, string> = {
+    low: '低',
+    medium: '中',
+    high: '高',
+  };
+  return priorityMap[priority] || priority;
+};
+
+export const getTicketPriorityBadgeClass = (priority: string): string => {
+  const classMap: Record<string, string> = {
+    low: 'badge-success',
+    medium: 'badge-warning',
+    high: 'badge-danger',
+  };
+  return classMap[priority] || 'badge-info';
+};
+
+export const formatVersionPurpose = (purpose: string): string => {
+  const purposeMap: Record<string, string> = {
+    customer_query: '客户查询',
+    audit: '审计合规',
+    complaint: '客诉处理',
+    insurance: '保险理赔',
+    other: '其他用途',
+  };
+  return purposeMap[purpose] || purpose;
+};
