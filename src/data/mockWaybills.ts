@@ -18,6 +18,7 @@ export const mockWaybills: Waybill[] = [
     totalDuration: 18.5,
     complianceRate: 97.8,
     alertCount: 2,
+    riskLevel: 'minor',
   },
   {
     id: 'CC202606200002',
@@ -36,6 +37,7 @@ export const mockWaybills: Waybill[] = [
     totalDuration: 6.2,
     complianceRate: 100,
     alertCount: 0,
+    riskLevel: 'compliant',
   },
   {
     id: 'CC202606190003',
@@ -54,6 +56,7 @@ export const mockWaybills: Waybill[] = [
     totalDuration: 4.8,
     complianceRate: 95.2,
     alertCount: 1,
+    riskLevel: 'minor',
   },
   {
     id: 'CC202606190004',
@@ -72,6 +75,7 @@ export const mockWaybills: Waybill[] = [
     totalDuration: 22.3,
     complianceRate: 88.5,
     alertCount: 5,
+    riskLevel: 'severe',
   },
   {
     id: 'CC202606180005',
@@ -90,6 +94,7 @@ export const mockWaybills: Waybill[] = [
     totalDuration: 12.6,
     complianceRate: 100,
     alertCount: 0,
+    riskLevel: 'compliant',
   },
   {
     id: 'CC202606180006',
@@ -108,6 +113,7 @@ export const mockWaybills: Waybill[] = [
     totalDuration: 8.4,
     complianceRate: 99.1,
     alertCount: 1,
+    riskLevel: 'minor',
   },
   {
     id: 'CC202606170007',
@@ -126,6 +132,7 @@ export const mockWaybills: Waybill[] = [
     totalDuration: 28.5,
     complianceRate: 96.7,
     alertCount: 3,
+    riskLevel: 'minor',
   },
   {
     id: 'CC202606170008',
@@ -144,5 +151,6 @@ export const mockWaybills: Waybill[] = [
     totalDuration: 5.8,
     complianceRate: 100,
     alertCount: 0,
+    riskLevel: 'compliant',
   },
 ];

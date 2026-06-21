@@ -1,4 +1,4 @@
-import { Snowflake, CheckCircle, AlertTriangle, FileText, MapPin, Clock } from 'lucide-react';
+import { Snowflake, CheckCircle, AlertTriangle, FileText, MapPin, Clock, MessageSquare } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import {
   formatDateTime,
@@ -19,6 +19,7 @@ export const CertificatePreview = () => {
   const alertRecords = useAppStore((state) => state.alertRecords);
   const signatureNodes = useAppStore((state) => state.signatureNodes);
   const handlingActions = useAppStore((state) => state.handlingActions);
+  const customerSummary = useAppStore((state) => state.customerSummary);
 
   const selectedSegments = certificateSegments.filter((s) => s.selected);
   const selectedAlertIds = selectedSegments
@@ -147,10 +148,77 @@ export const CertificatePreview = () => {
           </div>
         </div>
 
+        {customerSummary && (
+          <div className="mb-6">
+            <h2 className="text-sm font-semibold text-neutral-800 mb-3 pb-2 border-b border-neutral-200">
+              二、运输情况摘要
+            </h2>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="bg-neutral-50 rounded-lg p-3 text-center">
+                <p className="text-xs text-neutral-500 mb-1">温度合规率</p>
+                <p className={`text-lg font-bold ${
+                  customerSummary.complianceRate >= 98 ? 'text-success-600' :
+                  customerSummary.complianceRate >= 95 ? 'text-warning-600' : 'text-danger-600'
+                }`}>
+                  {formatPercentage(customerSummary.complianceRate)}
+                </p>
+              </div>
+              <div className="bg-neutral-50 rounded-lg p-3 text-center">
+                <p className="text-xs text-neutral-500 mb-1">异常次数</p>
+                <p className="text-lg font-bold text-neutral-800">
+                  {customerSummary.totalAlerts} 次
+                </p>
+              </div>
+              <div className="bg-neutral-50 rounded-lg p-3 text-center">
+                <p className="text-xs text-neutral-500 mb-1">处置状态</p>
+                <p className="text-lg font-bold text-success-600">
+                  {customerSummary.totalAlerts === 0 ? '无异常' : '已处理'}
+                </p>
+              </div>
+            </div>
+            <div className="bg-primary-50 rounded-lg p-4 border border-primary-100">
+              <div className="flex items-start gap-2">
+                <MessageSquare className="w-4 h-4 text-primary-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-medium text-primary-700 mb-1">情况说明</p>
+                  <p className="text-xs text-neutral-700 leading-relaxed">
+                    {customerSummary.conclusion}
+                  </p>
+                </div>
+              </div>
+            </div>
+            {customerSummary.alertDetails.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-neutral-700 mb-2">异常明细</p>
+                <div className="space-y-2">
+                  {customerSummary.alertDetails.map((detail, index) => (
+                    <div key={index} className="bg-neutral-50 rounded-lg p-3 text-xs">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="w-5 h-5 rounded-full bg-warning-500 text-white text-[10px] font-medium flex items-center justify-center">
+                          {index + 1}
+                        </span>
+                        <span className="font-medium text-neutral-800">{detail.time}</span>
+                        <span className="text-warning-600">{detail.duration}</span>
+                        <span className="text-danger-600 font-mono">{detail.maxTemp}</span>
+                      </div>
+                      <p className="text-neutral-600 ml-7">
+                        {detail.location} · {detail.cause}
+                      </p>
+                      <p className="text-success-600 ml-7 mt-1">
+                        ✓ {detail.action} → {detail.result}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {includeFullTemp && temperatureReadings.length > 0 && (
           <div className="mb-6">
             <h2 className="text-sm font-semibold text-neutral-800 mb-3 pb-2 border-b border-neutral-200">
-              二、全程温度曲线
+              三、全程温度曲线
             </h2>
             <div className="relative">
               <svg width="100%" viewBox={`0 0 ${miniChartWidth} ${miniChartHeight}`}>
@@ -225,7 +293,7 @@ export const CertificatePreview = () => {
         {displayAlerts.length > 0 && (
           <div className="mb-6">
             <h2 className="text-sm font-semibold text-neutral-800 mb-3 pb-2 border-b border-neutral-200">
-              三、温度异常记录及处置
+              四、温度异常记录及处置
             </h2>
             <div className="space-y-4">
               {displayAlerts.map((alert, index) => {
@@ -301,7 +369,7 @@ export const CertificatePreview = () => {
         {displaySignatures.length > 0 && (
           <div className="mb-6">
             <h2 className="text-sm font-semibold text-neutral-800 mb-3 pb-2 border-b border-neutral-200">
-              四、签收节点
+              五、签收节点
             </h2>
             <div className="relative pl-6">
               <div className="absolute left-2 top-0 bottom-0 w-0.5 bg-primary-200" />

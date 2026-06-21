@@ -1,4 +1,5 @@
 export type WaybillStatus = 'in_transit' | 'delivered' | 'exception';
+export type RiskLevel = 'compliant' | 'minor' | 'severe';
 
 export interface Waybill {
   id: string;
@@ -17,6 +18,7 @@ export interface Waybill {
   totalDuration: number;
   complianceRate: number;
   alertCount: number;
+  riskLevel: RiskLevel;
 }
 
 export interface TemperatureReading {
@@ -91,6 +93,23 @@ export interface SearchFilters {
   waybillId: string;
   customerName: string;
   shipmentDate: string;
+  riskLevel: RiskLevel | 'all';
+}
+
+export interface CustomerSummary {
+  isFullyCompliant: boolean;
+  complianceRate: number;
+  totalAlerts: number;
+  alertDetails: {
+    time: string;
+    duration: string;
+    maxTemp: string;
+    location: string;
+    cause: string;
+    action: string;
+    result: string;
+  }[];
+  conclusion: string;
 }
 
 export interface AppState {
@@ -102,16 +121,20 @@ export interface AppState {
   handlingActions: HandlingAction[];
   signatureNodes: SignatureNode[];
   selectedAlertId: string | null;
+  selectedTimelineEventId: string | null;
   certificateSegments: CertificateSegment[];
+  customerSummary: CustomerSummary | null;
   searchFilters: SearchFilters;
   setSelectedWaybill: (waybill: Waybill | null) => void;
   setSelectedAlertId: (id: string | null) => void;
+  setSelectedTimelineEventId: (id: string | null) => void;
   setSearchFilters: (filters: Partial<SearchFilters>) => void;
   toggleSegment: (id: string) => void;
   selectAllSegments: () => void;
   clearSegments: () => void;
   resetSearchFilters: () => void;
   loadWaybillData: (waybillId: string) => void;
+  generateCustomerSummary: () => void;
   getFilteredWaybills: () => Waybill[];
   getAlertById: (id: string) => AlertRecord | undefined;
   getHandlingActionByAlertId: (alertId: string) => HandlingAction | undefined;

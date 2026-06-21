@@ -5,6 +5,7 @@ import { getTemperaturesByWaybillId } from '@/data/mockTemperatures';
 import { getEventsByWaybillId, getHandlingActionsByWaybillId, getSignatureNodesByWaybillId } from '@/data/mockEvents';
 import { getAlertRecordsByWaybillId } from '@/data/mockAlerts';
 import { formatDateTime } from '@/utils/format';
+import { generateCustomerSummary } from '@/utils/summary';
 
 const generateCertificateSegments = (waybillId: string): CertificateSegment[] => {
   const events = getEventsByWaybillId(waybillId);
@@ -73,11 +74,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   handlingActions: [],
   signatureNodes: [],
   selectedAlertId: null,
+  selectedTimelineEventId: null,
   certificateSegments: [],
+  customerSummary: null,
   searchFilters: {
     waybillId: '',
     customerName: '',
     shipmentDate: '',
+    riskLevel: 'all',
   },
 
   setSelectedWaybill: (waybill: Waybill | null) => {
@@ -89,6 +93,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setSelectedAlertId: (id: string | null) => {
     set({ selectedAlertId: id });
+  },
+
+  setSelectedTimelineEventId: (id: string | null) => {
+    set({ selectedTimelineEventId: id });
+  },
+
+  generateCustomerSummary: () => {
+    const { selectedWaybill, alertRecords, handlingActions } = get();
+    if (!selectedWaybill) return;
+    const summary = generateCustomerSummary(selectedWaybill, alertRecords, handlingActions);
+    set({ customerSummary: summary });
   },
 
   setSearchFilters: (filters) => {
@@ -129,6 +144,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         waybillId: '',
         customerName: '',
         shipmentDate: '',
+        riskLevel: 'all',
       },
     });
   },
@@ -140,6 +156,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const actions = getHandlingActionsByWaybillId(waybillId);
     const signatures = getSignatureNodesByWaybillId(waybillId);
     const segments = generateCertificateSegments(waybillId);
+    const waybill = get().waybills.find((w) => w.id === waybillId);
+    const summary = waybill ? generateCustomerSummary(waybill, alerts, actions) : null;
 
     set({
       temperatureReadings: temperatures,
@@ -149,6 +167,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       signatureNodes: signatures,
       certificateSegments: segments,
       selectedAlertId: null,
+      selectedTimelineEventId: null,
+      customerSummary: summary,
     });
   },
 
@@ -166,7 +186,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       const matchesDate = searchFilters.shipmentDate
         ? waybill.shipmentDate === searchFilters.shipmentDate
         : true;
-      return matchesId && matchesCustomer && matchesDate;
+      const matchesRisk = searchFilters.riskLevel && searchFilters.riskLevel !== 'all'
+        ? waybill.riskLevel === searchFilters.riskLevel
+        : true;
+      return matchesId && matchesCustomer && matchesDate && matchesRisk;
     });
   },
 

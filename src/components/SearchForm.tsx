@@ -1,5 +1,13 @@
-import { Search, RotateCcw, CalendarSearch, UserSearch, Barcode } from 'lucide-react';
+import { Search, RotateCcw, CalendarSearch, UserSearch, Barcode, AlertTriangle, CheckCircle2, ShieldAlert, Filter } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
+import type { RiskLevel } from '@/types';
+
+const riskOptions: { value: RiskLevel | 'all'; icon: React.ReactNode; label: string }[] = [
+  { value: 'all', icon: <Filter className="w-4 h-4" />, label: '全部' },
+  { value: 'severe', icon: <ShieldAlert className="w-4 h-4" />, label: '严重异常' },
+  { value: 'minor', icon: <AlertTriangle className="w-4 h-4" />, label: '轻微异常' },
+  { value: 'compliant', icon: <CheckCircle2 className="w-4 h-4" />, label: '全程合规' },
+];
 
 export const SearchForm = () => {
   const searchFilters = useAppStore((state) => state.searchFilters);
@@ -12,10 +20,35 @@ export const SearchForm = () => {
 
   return (
     <div className="card p-6 mb-6">
-      <h2 className="text-lg font-semibold text-neutral-800 mb-4 flex items-center gap-2">
-        <Search className="w-5 h-5 text-primary-500" />
-        运单检索
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-neutral-800 flex items-center gap-2">
+          <Search className="w-5 h-5 text-primary-500" />
+          运单检索
+        </h2>
+        <div className="flex items-center gap-2">
+          {riskOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setSearchFilters({ riskLevel: option.value })}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                searchFilters.riskLevel === option.value
+                  ? option.value === 'severe'
+                    ? 'bg-danger-100 text-danger-700 ring-2 ring-danger-500/20'
+                    : option.value === 'minor'
+                    ? 'bg-warning-100 text-warning-700 ring-2 ring-warning-500/20'
+                    : option.value === 'compliant'
+                    ? 'bg-success-100 text-success-700 ring-2 ring-success-500/20'
+                    : 'bg-primary-100 text-primary-700 ring-2 ring-primary-500/20'
+                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+              }`}
+            >
+              {option.icon}
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>

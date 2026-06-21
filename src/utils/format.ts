@@ -133,3 +133,31 @@ export const getTimeDiff = (start: string, end: string): number => {
   const endDate = new Date(end).getTime();
   return Math.round((endDate - startDate) / 1000 / 60);
 };
+
+export const formatRiskLevel = (level: string): string => {
+  const levelMap: Record<string, string> = {
+    compliant: '全程合规',
+    minor: '轻微异常',
+    severe: '严重异常',
+    all: '全部运单',
+  };
+  return levelMap[level] || level;
+};
+
+export const getRiskLevelBadgeClass = (level: string): string => {
+  const classMap: Record<string, string> = {
+    compliant: 'badge-success',
+    minor: 'badge-warning',
+    severe: 'badge-danger',
+  };
+  return classMap[level] || 'badge-info';
+};
+
+export const getRiskLevelColor = (level: string): string => {
+  const colorMap: Record<string, string> = {
+    compliant: '#10B981',
+    minor: '#F59E0B',
+    severe: '#EF4444',
+  };
+  return colorMap[level] || '#64748B';
+};

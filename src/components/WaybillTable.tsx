@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
-import { Eye, Thermometer, FileText, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Eye, Thermometer, FileText, ChevronLeft, ChevronRight, AlertTriangle, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import { formatDate, formatStatus, formatTempRange, getStatusBadgeClass } from '@/utils/format';
+import { formatDate, formatStatus, formatTempRange, getStatusBadgeClass, formatRiskLevel, getRiskLevelBadgeClass } from '@/utils/format';
 
 export const WaybillTable = () => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -26,7 +26,10 @@ export const WaybillTable = () => {
       const matchesDate = searchFilters.shipmentDate
         ? waybill.shipmentDate === searchFilters.shipmentDate
         : true;
-      return matchesId && matchesCustomer && matchesDate;
+      const matchesRisk = searchFilters.riskLevel && searchFilters.riskLevel !== 'all'
+        ? waybill.riskLevel === searchFilters.riskLevel
+        : true;
+      return matchesId && matchesCustomer && matchesDate && matchesRisk;
     });
   }, [waybills, searchFilters]);
 
@@ -58,6 +61,12 @@ export const WaybillTable = () => {
               </th>
               <th className="text-left px-6 py-3.5 text-xs font-semibold text-neutral-500 uppercase tracking-wider">
                 要求温区
+              </th>
+              <th className="text-left px-6 py-3.5 text-xs font-semibold text-neutral-500 uppercase tracking-wider">
+                合规率
+              </th>
+              <th className="text-left px-6 py-3.5 text-xs font-semibold text-neutral-500 uppercase tracking-wider">
+                风险等级
               </th>
               <th className="text-left px-6 py-3.5 text-xs font-semibold text-neutral-500 uppercase tracking-wider">
                 发货日期
@@ -111,6 +120,22 @@ export const WaybillTable = () => {
                       {formatTempRange(waybill.tempMin, waybill.tempMax)}
                     </span>
                   </td>
+                  <td className="px-6 py-4">
+                    <span className={`font-mono text-sm font-medium ${
+                      waybill.complianceRate >= 99 ? 'text-success-600' :
+                      waybill.complianceRate >= 95 ? 'text-warning-600' : 'text-danger-600'
+                    }`}>
+                      {waybill.complianceRate.toFixed(1)}%
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center gap-1 ${getRiskLevelBadgeClass(waybill.riskLevel)}`}>
+                      {waybill.riskLevel === 'severe' && <ShieldAlert className="w-3 h-3" />}
+                      {waybill.riskLevel === 'minor' && <AlertTriangle className="w-3 h-3" />}
+                      {waybill.riskLevel === 'compliant' && <CheckCircle2 className="w-3 h-3" />}
+                      {formatRiskLevel(waybill.riskLevel)}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-sm text-neutral-700">
                     {formatDate(waybill.shipmentDate)}
                   </td>
@@ -145,7 +170,7 @@ export const WaybillTable = () => {
             {displayedWaybills.length === 0 && (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={10}
                   className="px-6 py-12 text-center text-neutral-500"
                 >
                   <Eye className="w-12 h-12 mx-auto mb-3 text-neutral-300" />

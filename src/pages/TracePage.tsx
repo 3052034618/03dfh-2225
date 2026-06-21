@@ -1,8 +1,6 @@
 import { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { TempChart } from '@/components/TempChart';
-import { Timeline } from '@/components/Timeline';
-import { DetailPanel } from '@/components/DetailPanel';
+import { UnifiedTimeline } from '@/components/UnifiedTimeline';
 import { StatsCard } from '@/components/StatsCard';
 import { useAppStore } from '@/store/useAppStore';
 import {
@@ -30,8 +28,7 @@ export const TracePage = () => {
   const temperatureReadings = useAppStore((state) => state.temperatureReadings);
   const timelineEvents = useAppStore((state) => state.timelineEvents);
   const alertRecords = useAppStore((state) => state.alertRecords);
-  const selectedAlertId = useAppStore((state) => state.selectedAlertId);
-  const setSelectedAlertId = useAppStore((state) => state.setSelectedAlertId);
+  const handlingActions = useAppStore((state) => state.handlingActions);
 
   useEffect(() => {
     if (id) {
@@ -149,20 +146,16 @@ export const TracePage = () => {
         </div>
       </div>
 
-      <div className="mb-6">
-        <TempChart
-          readings={temperatureReadings}
-          minTemp={selectedWaybill.tempMin}
-          maxTemp={selectedWaybill.tempMax}
-          alerts={alertRecords}
-        />
-      </div>
-
-      <Timeline events={timelineEvents} />
-
-      <DetailPanel
-        isOpen={!!selectedAlertId}
-        onClose={() => setSelectedAlertId(null)}
+      <UnifiedTimeline
+        readings={temperatureReadings}
+        minTemp={selectedWaybill.tempMin}
+        maxTemp={selectedWaybill.tempMax}
+        alerts={alertRecords}
+        events={timelineEvents}
+        handlingActions={handlingActions}
+        driverName={selectedWaybill.driverName}
+        driverPhone={selectedWaybill.driverPhone}
+        vehicleNo={selectedWaybill.vehicleNo}
       />
     </div>
   );
