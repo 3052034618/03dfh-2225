@@ -3,6 +3,7 @@ export type RiskLevel = 'compliant' | 'minor' | 'severe';
 export type TicketStatus = 'pending' | 'in_progress' | 'resolved' | 'escalated';
 export type TicketPriority = 'low' | 'medium' | 'high';
 export type VersionPurpose = 'customer_query' | 'audit' | 'complaint' | 'insurance' | 'other';
+export type TicketLogType = 'status_change' | 'remark' | 'material' | 'assignment' | 'creation' | 'escalation';
 
 export interface Waybill {
   id: string;
@@ -92,13 +93,6 @@ export interface CertificateSegment {
   title: string;
 }
 
-export interface SearchFilters {
-  waybillId: string;
-  customerName: string;
-  shipmentDate: string;
-  riskLevel: RiskLevel | 'all';
-}
-
 export interface CustomerSummary {
   isFullyCompliant: boolean;
   complianceRate: number;
@@ -113,6 +107,19 @@ export interface CustomerSummary {
     result: string;
   }[];
   conclusion: string;
+}
+
+export interface TicketActivityLog {
+  id: string;
+  ticketId: string;
+  type: TicketLogType;
+  timestamp: string;
+  operator: string;
+  oldValue?: string;
+  newValue?: string;
+  content?: string;
+  fileUrl?: string;
+  fileName?: string;
 }
 
 export interface DisputeTicket {
@@ -131,6 +138,38 @@ export interface DisputeTicket {
   resolution?: string;
   followUpDate?: string;
   tags: string[];
+  activityLogs: TicketActivityLog[];
+}
+
+export interface CustomerExplainPackage {
+  id: string;
+  customerName: string;
+  createdAt: string;
+  createdBy: string;
+  waybillIds: string[];
+  totalAlerts: number;
+  severeAlerts: number;
+  minorAlerts: number;
+  avgComplianceRate: number;
+  conclusion: string;
+  waybillSummaries: {
+    waybillId: string;
+    waybillIdDisplay: string;
+    shipmentDate: string;
+    route: string;
+    goodsType: string;
+    complianceRate: number;
+    alerts: number;
+    alertDetails: {
+      time: string;
+      duration: string;
+      maxTemp: string;
+      location: string;
+      cause: string;
+      action: string;
+      result: string;
+    }[];
+  }[];
 }
 
 export interface CertificateVersion {
@@ -183,6 +222,7 @@ export interface AppState {
   disputeTickets: DisputeTicket[];
   certificateVersions: CertificateVersion[];
   customerSummaries: CustomerExceptionSummary[];
+  explainPackages: CustomerExplainPackage[];
   selectedTicketId: string | null;
   selectedVersionId: string | null;
   setSelectedWaybill: (waybill: Waybill | null) => void;
@@ -200,11 +240,14 @@ export interface AppState {
   getAlertById: (id: string) => AlertRecord | undefined;
   getHandlingActionByAlertId: (alertId: string) => HandlingAction | undefined;
   getSignatureNodesByWaybillId: (waybillId: string) => SignatureNode[];
-  createDisputeTicket: (ticket: Omit<DisputeTicket, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  createDisputeTicket: (ticket: Omit<DisputeTicket, 'id' | 'createdAt' | 'updatedAt' | 'activityLogs'>) => void;
   updateDisputeTicket: (id: string, updates: Partial<DisputeTicket>) => void;
+  changeTicketStatus: (id: string, newStatus: TicketStatus, remark?: string) => void;
+  addTicketRemark: (id: string, content: string) => void;
   getFilteredTickets: () => DisputeTicket[];
   saveCertificateVersion: (purpose: VersionPurpose, customNote?: string) => void;
   getVersionsByWaybillId: (waybillId: string) => CertificateVersion[];
   restoreCertificateVersion: (versionId: string) => void;
   getCustomerExceptionSummary: (customerName: string) => CustomerExceptionSummary | undefined;
+  generateCustomerExplainPackage: (customerName: string, selectedWaybillIds?: string[]) => CustomerExplainPackage;
 }

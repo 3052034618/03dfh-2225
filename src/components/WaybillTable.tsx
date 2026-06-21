@@ -1,15 +1,18 @@
 import { Link } from 'react-router-dom';
-import { Eye, Thermometer, FileText, ChevronLeft, ChevronRight, AlertTriangle, ShieldAlert, CheckCircle2, ListTodo, ArrowUpCircle, CheckCheck } from 'lucide-react';
+import { Eye, Thermometer, FileText, ChevronLeft, ChevronRight, AlertTriangle, ShieldAlert, CheckCircle2, ListTodo, ArrowUpCircle, CheckCheck, FileSearch } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDate, formatStatus, formatTempRange, getStatusBadgeClass, formatRiskLevel, getRiskLevelBadgeClass, formatTicketStatus, getTicketStatusBadgeClass, formatTicketPriority, getTicketPriorityBadgeClass } from '@/utils/format';
 import type { Waybill, DisputeTicket } from '@/types';
 import { CreateTicketModal } from './CreateTicketModal';
+import { TicketDetailModal } from './TicketDetailModal';
 
 export const WaybillTable = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [selectedWaybillForTicket, setSelectedWaybillForTicket] = useState<Waybill | null>(null);
+  const [ticketDetailModalOpen, setTicketDetailModalOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<DisputeTicket | null>(null);
   const pageSize = 10;
 
   const waybills = useAppStore((state) => state.waybills);
@@ -17,7 +20,7 @@ export const WaybillTable = () => {
   const searchFilters = useAppStore((state) => state.searchFilters);
   const selectedWaybill = useAppStore((state) => state.selectedWaybill);
   const setSelectedWaybill = useAppStore((state) => state.setSelectedWaybill);
-  const updateDisputeTicket = useAppStore((state) => state.updateDisputeTicket);
+  const changeTicketStatus = useAppStore((state) => state.changeTicketStatus);
 
   const filteredWaybills = useMemo(() => {
     return waybills.filter((waybill) => {
@@ -72,11 +75,16 @@ export const WaybillTable = () => {
   };
 
   const handleResolveTicket = (ticketId: string) => {
-    updateDisputeTicket(ticketId, { status: 'resolved' });
+    changeTicketStatus(ticketId, 'resolved');
   };
 
   const handleEscalateTicket = (ticketId: string) => {
-    updateDisputeTicket(ticketId, { status: 'escalated' });
+    changeTicketStatus(ticketId, 'escalated');
+  };
+
+  const handleOpenTicketDetail = (ticket: DisputeTicket) => {
+    setSelectedTicket(ticket);
+    setTicketDetailModalOpen(true);
   };
 
   return (
@@ -319,6 +327,15 @@ export const WaybillTable = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenTicketDetail(ticket)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+                          title="查看详情"
+                        >
+                          <FileSearch className="w-3.5 h-3.5" />
+                          详情
+                        </button>
                         {ticket.status !== 'resolved' && (
                           <button
                             type="button"
@@ -327,7 +344,7 @@ export const WaybillTable = () => {
                             title="标记已解决"
                           >
                             <CheckCheck className="w-3.5 h-3.5" />
-                            标记已解决
+                            已解决
                           </button>
                         )}
                         {ticket.status !== 'escalated' && ticket.status !== 'resolved' && (
@@ -338,7 +355,7 @@ export const WaybillTable = () => {
                             title="升级处理"
                           >
                             <ArrowUpCircle className="w-3.5 h-3.5" />
-                            升级处理
+                            升级
                           </button>
                         )}
                       </div>
@@ -408,6 +425,17 @@ export const WaybillTable = () => {
         waybillId={selectedWaybillForTicket?.id}
         waybillData={selectedWaybillForTicket || undefined}
       />
+
+      {selectedTicket && (
+        <TicketDetailModal
+          isOpen={ticketDetailModalOpen}
+          onClose={() => {
+            setTicketDetailModalOpen(false);
+            setSelectedTicket(null);
+          }}
+          ticket={selectedTicket}
+        />
+      )}
     </>
   );
 };

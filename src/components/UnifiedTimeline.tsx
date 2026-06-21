@@ -22,10 +22,7 @@ import type {
   HandlingAction,
 } from '@/types';
 import {
-  generateTemperaturePath,
   getYForTemp,
-  getXForIndex,
-  findNearestReading,
 } from '@/utils/temperature';
 import {
   formatDateTime,
@@ -77,25 +74,68 @@ export const UnifiedTimeline = ({
   const height = 300;
   const padding = 60;
 
-  const path = useMemo(
-    () => generateTemperaturePath(readings, width, height, minTemp, maxTemp),
-    [readings, minTemp, maxTemp]
-  );
-
   const sortedEvents = useMemo(
     () => [...events].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
     [events]
   );
 
+  const { firstTime, lastTime, totalRange } = useMemo(() => {
+    const firstReadingTime = readings.length > 0 ? new Date(readings[0].timestamp).getTime() : Infinity;
+    const lastReadingTime = readings.length > 0 ? new Date(readings[readings.length - 1].timestamp).getTime() : -Infinity;
+    const firstEventTime = sortedEvents.length > 0 ? new Date(sortedEvents[0].timestamp).getTime() : Infinity;
+    const lastEventTime = sortedEvents.length > 0 ? new Date(sortedEvents[sortedEvents.length - 1].timestamp).getTime() : -Infinity;
+    const ft = Math.min(firstReadingTime, firstEventTime);
+    const lt = Math.max(lastReadingTime, lastEventTime);
+    const rawRange = lt - ft;
+    const padAmount = rawRange * 0.02;
+    return {
+      firstTime: ft - padAmount,
+      lastTime: lt + padAmount,
+      totalRange: rawRange + padAmount * 2,
+    };
+  }, [readings, sortedEvents]);
+
+  const getXForTime = (time: number): number => {
+    if (totalRange === 0) return padding;
+    return padding + ((time - firstTime) / totalRange) * (width - padding * 2);
+  };
+
+  const path = useMemo(() => {
+    if (readings.length === 0) return '';
+
+    const tempMin = Math.min(...readings.map((r) => r.temperature), minTemp) - 2;
+    const tempMax = Math.max(...readings.map((r) => r.temperature), maxTemp) + 2;
+    const tempRange = tempMax - tempMin;
+    const chartHeight = height - padding * 2;
+
+    const points = readings.map((reading) => {
+      const time = new Date(reading.timestamp).getTime();
+      const x = getXForTime(time);
+      const y = padding + chartHeight - ((reading.temperature - tempMin) / tempRange) * chartHeight;
+      return { x, y };
+    });
+
+    if (points.length < 2) return '';
+
+    let d = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const cpx1 = prev.x + (curr.x - prev.x) / 3;
+      const cpy1 = prev.y;
+      const cpx2 = prev.x + ((curr.x - prev.x) * 2) / 3;
+      const cpy2 = curr.y;
+      d += ` C ${cpx1.toFixed(2)} ${cpy1.toFixed(2)}, ${cpx2.toFixed(2)} ${cpy2.toFixed(2)}, ${curr.x.toFixed(2)} ${curr.y.toFixed(2)}`;
+    }
+    return d;
+  }, [readings, minTemp, maxTemp, firstTime, lastTime, totalRange, padding, width, height]);
+
   const eventMarkers = useMemo((): EventMarker[] => {
-    if (readings.length === 0) return [];
-    const firstTime = new Date(readings[0].timestamp).getTime();
-    const lastTime = new Date(readings[readings.length - 1].timestamp).getTime();
-    const totalRange = lastTime - firstTime;
+    if (readings.length === 0 && sortedEvents.length === 0) return [];
 
     return sortedEvents.map((event) => {
       const eventTime = new Date(event.timestamp).getTime();
-      const x = padding + ((eventTime - firstTime) / totalRange) * (width - padding * 2);
+      const x = getXForTime(eventTime);
       return {
         x: Math.max(padding, Math.min(width - padding, x)),
         event,
@@ -103,17 +143,15 @@ export const UnifiedTimeline = ({
         color: getEventColor(event.type),
       };
     });
-  }, [sortedEvents, readings]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortedEvents, firstTime, lastTime, totalRange, readings, padding, width]);
 
   const getAlertXRange = (alert: AlertRecord) => {
     const startTime = new Date(alert.startTime).getTime();
     const endTime = new Date(alert.endTime).getTime();
-    const firstTime = new Date(readings[0].timestamp).getTime();
-    const lastTime = new Date(readings[readings.length - 1].timestamp).getTime();
-    const totalRange = lastTime - firstTime;
 
-    const startX = padding + ((startTime - firstTime) / totalRange) * (width - padding * 2);
-    const endX = padding + ((endTime - firstTime) / totalRange) * (width - padding * 2);
+    const startX = getXForTime(startTime);
+    const endX = getXForTime(endTime);
 
     return { startX, endX };
   };
@@ -124,8 +162,23 @@ export const UnifiedTimeline = ({
     const y = e.clientY - rect.top;
     setMousePos({ x, y });
 
-    const reading = findNearestReading(x, readings, width);
-    setHoveredReading(reading);
+    if (readings.length === 0 || totalRange === 0) {
+      setHoveredReading(null);
+      return;
+    }
+    const chartWidth = width - padding * 2;
+    const ratio = (x - padding) / chartWidth;
+    const targetTime = firstTime + ratio * totalRange;
+    let nearest: TemperatureReading | null = null;
+    let minDiff = Infinity;
+    for (const r of readings) {
+      const diff = Math.abs(new Date(r.timestamp).getTime() - targetTime);
+      if (diff < minDiff) {
+        minDiff = diff;
+        nearest = r;
+      }
+    }
+    setHoveredReading(nearest);
   };
 
   const handleMouseLeave = () => {
@@ -183,10 +236,29 @@ export const UnifiedTimeline = ({
     return Array.from({ length: 5 }, (_, i) => tempMin + (i / 4) * (tempMax - tempMin));
   }, [readings, minTemp, maxTemp]);
 
-  const xAxisLabels = useMemo(
-    () => readings.filter((_, i) => i % Math.floor(readings.length / 6) === 0),
-    [readings]
-  );
+  const xAxisLabels = useMemo(() => {
+    if (readings.length === 0) return [];
+    const count = Math.min(6, readings.length);
+    const step = totalRange / (count - 1 || 1);
+    const labels: TemperatureReading[] = [];
+    for (let i = 0; i < count; i++) {
+      const targetTime = firstTime + step * i;
+      let nearest: TemperatureReading | null = null;
+      let minDiff = Infinity;
+      for (const r of readings) {
+        const diff = Math.abs(new Date(r.timestamp).getTime() - targetTime);
+        if (diff < minDiff) {
+          minDiff = diff;
+          nearest = r;
+        }
+      }
+      if (nearest && !labels.find((l) => l.id === nearest!.id)) {
+        labels.push(nearest);
+      }
+    }
+    return labels;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readings, firstTime, totalRange]);
 
   if (readings.length === 0) {
     return (
@@ -300,7 +372,7 @@ export const UnifiedTimeline = ({
             })}
 
             <path
-              d={`${path} L ${getXForIndex(readings.length - 1, readings.length, width)} ${height - padding} L ${padding} ${height - padding} Z`}
+              d={`${path} L ${readings.length > 0 ? getXForTime(new Date(readings[readings.length - 1].timestamp).getTime()) : padding} ${height - padding} L ${readings.length > 0 ? getXForTime(new Date(readings[0].timestamp).getTime()) : padding} ${height - padding} Z`}
               fill="url(#unifiedTempGradient)"
             />
 
@@ -355,28 +427,16 @@ export const UnifiedTimeline = ({
             {hoveredReading && (
               <>
                 <line
-                  x1={getXForIndex(
-                    readings.findIndex((r) => r.id === hoveredReading.id),
-                    readings.length,
-                    width
-                  )}
+                  x1={getXForTime(new Date(hoveredReading.timestamp).getTime())}
                   y1={padding}
-                  x2={getXForIndex(
-                    readings.findIndex((r) => r.id === hoveredReading.id),
-                    readings.length,
-                    width
-                  )}
+                  x2={getXForTime(new Date(hoveredReading.timestamp).getTime())}
                   y2={height - padding}
                   stroke="#0EA5E9"
                   strokeWidth={1}
                   strokeDasharray="4,4"
                 />
                 <circle
-                  cx={getXForIndex(
-                    readings.findIndex((r) => r.id === hoveredReading.id),
-                    readings.length,
-                    width
-                  )}
+                  cx={getXForTime(new Date(hoveredReading.timestamp).getTime())}
                   cy={getYForTemp(hoveredReading.temperature, readings, height, minTemp, maxTemp)}
                   r={6}
                   fill="white"
@@ -387,11 +447,10 @@ export const UnifiedTimeline = ({
             )}
 
             {xAxisLabels.map((reading, i) => {
-              const index = readings.findIndex((r) => r.id === reading.id);
               return (
                 <text
                   key={i}
-                  x={getXForIndex(index, readings.length, width)}
+                  x={getXForTime(new Date(reading.timestamp).getTime())}
                   y={height + 20}
                   textAnchor="middle"
                   className="text-xs fill-neutral-500"

@@ -1,7 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { UnifiedTimeline } from '@/components/UnifiedTimeline';
 import { StatsCard } from '@/components/StatsCard';
+import { CustomerExplainPackageModal } from '@/components/CustomerExplainPackageModal';
 import { useAppStore } from '@/store/useAppStore';
 import {
   Package,
@@ -18,6 +19,7 @@ import {
   ShieldAlert,
   Clock,
   ChevronRight,
+  FileOutput,
 } from 'lucide-react';
 import {
   formatTempRange,
@@ -39,6 +41,8 @@ export const TracePage = () => {
   const handlingActions = useAppStore((state) => state.handlingActions);
   const getCustomerExceptionSummary = useAppStore((state) => state.getCustomerExceptionSummary);
   const disputeTickets = useAppStore((state) => state.disputeTickets);
+
+  const [showExplainPackage, setShowExplainPackage] = useState(false);
 
   const customerSummary = useMemo(() => {
     if (!selectedWaybill) return null;
@@ -131,12 +135,22 @@ export const TracePage = () => {
                 </p>
               </div>
             </div>
-            {customerSummary.last30DaysAlerts >= 5 && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-danger-100 text-danger-700 text-xs font-medium">
-                <ShieldAlert className="w-3.5 h-3.5" />
-                建议统一解释或升级处理
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {customerSummary.last30DaysAlerts >= 5 && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-danger-100 text-danger-700 text-xs font-medium">
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  建议统一解释或升级处理
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowExplainPackage(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 transition-colors shadow-sm"
+              >
+                <FileOutput className="w-3.5 h-3.5" />
+                生成客户解释包
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
@@ -307,6 +321,16 @@ export const TracePage = () => {
         driverPhone={selectedWaybill.driverPhone}
         vehicleNo={selectedWaybill.vehicleNo}
       />
+
+      {customerSummary && selectedWaybill && (
+        <CustomerExplainPackageModal
+          isOpen={showExplainPackage}
+          onClose={() => setShowExplainPackage(false)}
+          customerName={selectedWaybill.customerName}
+          riskWaybillIds={customerSummary.riskWaybills}
+          waybills={waybills}
+        />
+      )}
     </div>
   );
 };

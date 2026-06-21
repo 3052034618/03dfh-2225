@@ -33,10 +33,29 @@ const getPurposeBadgeClass = (purpose: string): string => {
 interface VersionItemProps {
   version: CertificateVersion;
   onRestore: (versionId: string) => void;
+  certificateSegments: Array<{ id: string; title: string }>;
 }
 
-const VersionItem = ({ version, onRestore }: VersionItemProps) => {
+const VersionItem = ({ version, onRestore, certificateSegments }: VersionItemProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [confirmRestore, setConfirmRestore] = useState(false);
+  const [restoreSuccess, setRestoreSuccess] = useState(false);
+
+  const handleRestoreClick = () => {
+    if (!confirmRestore) {
+      setConfirmRestore(true);
+      return;
+    }
+    onRestore(version.id);
+    setRestoreSuccess(true);
+    setConfirmRestore(false);
+    setTimeout(() => setRestoreSuccess(false), 2000);
+  };
+
+  const segmentTitles = version.selectedSegmentIds
+    .map((id) => certificateSegments.find((s) => s.id === id)?.title)
+    .filter(Boolean)
+    .join(', ');
 
   return (
     <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden transition-all duration-200 hover:shadow-md">
@@ -93,16 +112,26 @@ const VersionItem = ({ version, onRestore }: VersionItemProps) => {
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
+                {restoreSuccess ? (
+                  <div className="btn-success !h-9 !px-3 text-xs flex items-center gap-1">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    已恢复到 V{version.versionNumber}
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleRestoreClick}
+                    className={`${confirmRestore ? 'btn-danger' : 'btn-secondary'} !h-9 !px-3 text-xs`}
+                    title={confirmRestore ? '再次点击确认恢复' : '恢复此版本的片段选择和摘要'}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                    {confirmRestore ? '确认恢复?' : '恢复此版本'}
+                  </button>
+                )}
                 <button
-                  onClick={() => onRestore(version.id)}
-                  className="btn-secondary !h-9 !px-3 text-xs"
-                  title="恢复此版本的片段选择和摘要"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                  恢复此版本
-                </button>
-                <button
-                  onClick={() => setIsExpanded((prev) => !prev)}
+                  onClick={() => {
+                    setIsExpanded((prev) => !prev);
+                    if (confirmRestore) setConfirmRestore(false);
+                  }}
                   className="p-2 rounded-lg hover:bg-neutral-100 transition-colors text-neutral-500 hover:text-neutral-700"
                   title={isExpanded ? '收起摘要' : '查看摘要'}
                 >
@@ -120,6 +149,18 @@ const VersionItem = ({ version, onRestore }: VersionItemProps) => {
 
       {isExpanded && (
         <div className="border-t border-neutral-200 bg-neutral-50 px-4 py-4">
+          {segmentTitles && (
+            <div className="mb-4 bg-white rounded-lg p-3 border border-neutral-200">
+              <p className="text-xs text-neutral-700 flex items-start gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-primary-500 mt-0.5 flex-shrink-0" />
+                <span>
+                  <span className="font-medium text-neutral-800">包含片段：</span>
+                  {segmentTitles}
+                </span>
+              </p>
+            </div>
+          )}
+
           <div className="flex items-center gap-2 mb-3">
             <FileText className="w-4 h-4 text-primary-500" />
             <p className="text-sm font-medium text-neutral-700">摘要快照</p>
@@ -204,6 +245,7 @@ const VersionItem = ({ version, onRestore }: VersionItemProps) => {
 export const VersionHistoryPanel = ({ waybillId }: VersionHistoryPanelProps) => {
   const getVersionsByWaybillId = useAppStore((state) => state.getVersionsByWaybillId);
   const restoreCertificateVersion = useAppStore((state) => state.restoreCertificateVersion);
+  const certificateSegments = useAppStore((state) => state.certificateSegments);
 
   const versions = getVersionsByWaybillId(waybillId);
 
@@ -247,6 +289,7 @@ export const VersionHistoryPanel = ({ waybillId }: VersionHistoryPanelProps) => 
             key={version.id}
             version={version}
             onRestore={restoreCertificateVersion}
+            certificateSegments={certificateSegments}
           />
         ))}
       </div>

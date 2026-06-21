@@ -7,6 +7,9 @@ import type {
   CertificateVersion,
   VersionPurpose,
   AlertRecord,
+  TicketStatus,
+  TicketActivityLog,
+  CustomerExplainPackage,
 } from '@/types';
 import { mockWaybills } from '@/data/mockWaybills';
 import { getTemperaturesByWaybillId } from '@/data/mockTemperatures';
@@ -16,6 +19,7 @@ import {
   mockTickets,
   mockVersions,
   mockCustomerSummaries,
+  mockExplainPackages,
 } from '@/data/mockTickets';
 import { formatDateTime } from '@/utils/format';
 import { generateCustomerSummary } from '@/utils/summary';
@@ -93,6 +97,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   disputeTickets: mockTickets,
   certificateVersions: mockVersions,
   customerSummaries: mockCustomerSummaries,
+  explainPackages: mockExplainPackages,
   selectedTicketId: null,
   selectedVersionId: null,
   searchFilters: {
@@ -282,11 +287,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   createDisputeTicket: (ticketData) => {
+    const now = new Date().toISOString();
+    const newId = `T${Date.now()}`;
+    const creationLog: TicketActivityLog = {
+      id: `L${Date.now()}`,
+      ticketId: newId,
+      type: 'creation',
+      timestamp: now,
+      operator: '当前客服',
+      content: ticketData.description || '创建工单',
+    };
     const newTicket: DisputeTicket = {
       ...ticketData,
-      id: `T${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      id: newId,
+      createdAt: now,
+      updatedAt: now,
+      activityLogs: [creationLog],
     };
     set((state) => ({
       disputeTickets: [newTicket, ...state.disputeTickets],
@@ -368,5 +384,125 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   getCustomerExceptionSummary: (customerName: string) => {
     return get().customerSummaries.find((c) => c.customerName === customerName);
+  },
+
+  changeTicketStatus: (id: string, newStatus: TicketStatus, remark?: string) => {
+    const now = new Date().toISOString();
+    set((state) => ({
+      disputeTickets: state.disputeTickets.map((t) => {
+        if (t.id === id) {
+          const newLog: TicketActivityLog = {
+            id: `L${Date.now()}`,
+            ticketId: id,
+            type: 'status_change',
+            timestamp: now,
+            operator: '当前客服',
+            oldValue: t.status,
+            newValue: newStatus,
+            content: remark,
+          };
+          return {
+            ...t,
+            status: newStatus,
+            updatedAt: now,
+            activityLogs: [...t.activityLogs, newLog],
+          };
+        }
+        return t;
+      }),
+    }));
+  },
+
+  addTicketRemark: (id: string, content: string) => {
+    const now = new Date().toISOString();
+    set((state) => ({
+      disputeTickets: state.disputeTickets.map((t) => {
+        if (t.id === id) {
+          const newLog: TicketActivityLog = {
+            id: `L${Date.now()}`,
+            ticketId: id,
+            type: 'remark',
+            timestamp: now,
+            operator: '当前客服',
+            content,
+          };
+          return {
+            ...t,
+            updatedAt: now,
+            activityLogs: [...t.activityLogs, newLog],
+          };
+        }
+        return t;
+      }),
+    }));
+  },
+
+  generateCustomerExplainPackage: (customerName: string, selectedWaybillIds?: string[]): CustomerExplainPackage => {
+    const { waybills } = get();
+    const targetIds = selectedWaybillIds && selectedWaybillIds.length > 0
+      ? selectedWaybillIds
+      : waybills.filter((w) => w.customerName === customerName).map((w) => w.id);
+
+    const selectedWaybills = waybills.filter((w) => targetIds.includes(w.id));
+
+    const totalAlerts = selectedWaybills.reduce((sum, w) => sum + w.alertCount, 0);
+    const severeAlerts = selectedWaybills.filter((w) => w.riskLevel === 'severe').length;
+    const minorAlerts = selectedWaybills.filter((w) => w.riskLevel === 'minor').length;
+    const avgComplianceRate = selectedWaybills.length > 0
+      ? selectedWaybills.reduce((sum, w) => sum + w.complianceRate, 0) / selectedWaybills.length
+      : 100;
+
+    const waybillSummaries = selectedWaybills.map((w) => {
+      const alerts = getAlertRecordsByWaybillId(w.id);
+      const actions = getHandlingActionsByWaybillId(w.id);
+      return {
+        waybillId: w.id,
+        waybillIdDisplay: w.id,
+        shipmentDate: w.shipmentDate,
+        route: w.route,
+        goodsType: w.goodsType,
+        complianceRate: w.complianceRate,
+        alerts: w.alertCount,
+        alertDetails: alerts.map((alert) => {
+          const action = actions.find((a) => a.alertRecordId === alert.id);
+          return {
+            time: formatDateTime(alert.startTime),
+            duration: `${alert.durationMinutes} 分钟`,
+            maxTemp: `${alert.maxTemperature.toFixed(1)}°C`,
+            location: alert.location,
+            cause: action?.action || '设备波动',
+            action: action?.remark || '已跟进处理',
+            result: action?.result || '已恢复正常',
+          };
+        }),
+      };
+    });
+
+    let conclusion = '';
+    if (totalAlerts === 0) {
+      conclusion = `尊敬的${customerName}客户，您好！经核查，贵司近期${selectedWaybills.length}单运输全程温度合规，未触发任何温度报警，冷链温控记录完整，货物运输品质有保障。`;
+    } else {
+      conclusion = `尊敬的${customerName}客户，您好！针对贵司关注的${selectedWaybills.length}单运输，共记录${totalAlerts}次温度异常（严重${severeAlerts}次、轻微${minorAlerts}次），平均合规率${avgComplianceRate.toFixed(1)}%。我司已针对每次异常均已第一时间跟进处置，货物品质未受影响，相关处理措施及详情见下文说明。`;
+    }
+
+    const newPackage = {
+      id: `P${Date.now()}`,
+      customerName,
+      createdAt: new Date().toISOString(),
+      createdBy: '当前客服',
+      waybillIds: targetIds,
+      totalAlerts,
+      severeAlerts,
+      minorAlerts,
+      avgComplianceRate,
+      conclusion,
+      waybillSummaries,
+    };
+
+    set((state) => ({
+      explainPackages: [newPackage, ...state.explainPackages],
+    }));
+
+    return newPackage;
   },
 }));
