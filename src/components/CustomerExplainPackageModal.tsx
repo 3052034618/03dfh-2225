@@ -54,12 +54,12 @@ export const CustomerExplainPackageModal = ({
 
   useEffect(() => {
     if (isOpen) {
-      setSelectedIds(riskWaybillIds);
+      setSelectedIds(riskWaybills.map((w) => w.id));
       setGeneratedPackage(null);
       setExpandedWaybills({});
       setToast(null);
     }
-  }, [isOpen, riskWaybillIds]);
+  }, [isOpen, riskWaybills]);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -73,7 +73,7 @@ export const CustomerExplainPackageModal = ({
   };
 
   const handleSelectAll = () => {
-    setSelectedIds(riskWaybillIds);
+    setSelectedIds(riskWaybills.map((w) => w.id));
   };
 
   const handleClearAll = () => {
@@ -88,6 +88,10 @@ export const CustomerExplainPackageModal = ({
   };
 
   const handleGenerate = () => {
+    if (selectedIds.length === 0) {
+      showToast('请至少选择一个运单');
+      return;
+    }
     const pkg = generateCustomerExplainPackage(customerName, selectedIds);
     setGeneratedPackage(pkg);
     const initialExpanded: Record<string, boolean> = {};
@@ -168,22 +172,29 @@ export const CustomerExplainPackageModal = ({
                   <FileText className="w-4 h-4 text-primary-500" />
                   选择需要包含的运单（可多选）
                 </h4>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSelectAll}
-                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
-                  >
-                    全选
-                  </button>
-                  <span className="text-xs text-neutral-300">|</span>
-                  <button
-                    type="button"
-                    onClick={handleClearAll}
-                    className="text-xs text-neutral-500 hover:text-neutral-700 font-medium"
-                  >
-                    清空选择
-                  </button>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-neutral-600">
+                    已选择 <span className="font-semibold text-primary-600">{selectedIds.length}</span> 票
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSelectAll}
+                      disabled={riskWaybills.length === 0}
+                      className="text-xs text-primary-600 hover:text-primary-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      全选
+                    </button>
+                    <span className="text-xs text-neutral-300">|</span>
+                    <button
+                      type="button"
+                      onClick={handleClearAll}
+                      disabled={riskWaybills.length === 0}
+                      className="text-xs text-neutral-500 hover:text-neutral-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      清空选择
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -265,7 +276,7 @@ export const CustomerExplainPackageModal = ({
                 <button
                   type="button"
                   onClick={handleGenerate}
-                  disabled={selectedIds.length === 0}
+                  disabled={selectedIds.length === 0 || riskWaybills.length === 0}
                   className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Package className="w-4 h-4 mr-2" />
@@ -367,55 +378,64 @@ export const CustomerExplainPackageModal = ({
                             <ChevronDown className="w-4 h-4 text-neutral-400" />
                           )}
                         </button>
-                        {isExpanded && summary.alertDetails.length > 0 && (
-                          <div className="p-4 space-y-3">
-                            {summary.alertDetails.map((detail, idx) => (
-                              <div
-                                key={idx}
-                                className="bg-danger-50/50 border border-danger-100 rounded-lg p-3"
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div className="w-7 h-7 rounded-full bg-danger-100 flex items-center justify-center flex-shrink-0">
-                                    <Thermometer className="w-3.5 h-3.5 text-danger-600" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2 text-sm">
-                                      <span className="text-neutral-700">
-                                        <span className="text-neutral-400">时间：</span>
-                                        {detail.time}
-                                      </span>
-                                      <span className="text-neutral-700">
-                                        <span className="text-neutral-400">时长：</span>
-                                        {detail.duration}
-                                      </span>
-                                      <span className="text-danger-600 font-medium">
-                                        <span className="text-neutral-400 font-normal">最高温：</span>
-                                        {detail.maxTemp}
-                                      </span>
-                                      <span className="text-neutral-700">
-                                        <span className="text-neutral-400">地点：</span>
-                                        {detail.location}
-                                      </span>
+                        {isExpanded && (
+                          summary.alertDetails.length > 0 ? (
+                            <div className="p-4 space-y-3">
+                              {summary.alertDetails.map((detail, idx) => (
+                                <div
+                                  key={idx}
+                                  className="bg-danger-50/50 border border-danger-100 rounded-lg p-3"
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <div className="w-7 h-7 rounded-full bg-danger-100 flex items-center justify-center flex-shrink-0">
+                                      <Thermometer className="w-3.5 h-3.5 text-danger-600" />
                                     </div>
-                                    <div className="space-y-1 text-xs">
-                                      <p>
-                                        <span className="text-neutral-400 mr-2">原因：</span>
-                                        <span className="text-neutral-600">{detail.cause}</span>
-                                      </p>
-                                      <p>
-                                        <span className="text-neutral-400 mr-2">处置：</span>
-                                        <span className="text-neutral-600">{detail.action}</span>
-                                      </p>
-                                      <p>
-                                        <span className="text-neutral-400 mr-2">结果：</span>
-                                        <span className="text-success-600">{detail.result}</span>
-                                      </p>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2 text-sm">
+                                        <span className="text-neutral-700">
+                                          <span className="text-neutral-400">时间：</span>
+                                          {detail.time}
+                                        </span>
+                                        <span className="text-neutral-700">
+                                          <span className="text-neutral-400">时长：</span>
+                                          {detail.duration}
+                                        </span>
+                                        <span className="text-danger-600 font-medium">
+                                          <span className="text-neutral-400 font-normal">最高温：</span>
+                                          {detail.maxTemp}
+                                        </span>
+                                        <span className="text-neutral-700">
+                                          <span className="text-neutral-400">地点：</span>
+                                          {detail.location}
+                                        </span>
+                                      </div>
+                                      <div className="space-y-1 text-xs">
+                                        <p>
+                                          <span className="text-neutral-400 mr-2">原因：</span>
+                                          <span className="text-neutral-600">{detail.cause}</span>
+                                        </p>
+                                        <p>
+                                          <span className="text-neutral-400 mr-2">处置：</span>
+                                          <span className="text-neutral-600">{detail.action}</span>
+                                        </p>
+                                        <p>
+                                          <span className="text-neutral-400 mr-2">结果：</span>
+                                          <span className="text-success-600">{detail.result}</span>
+                                        </p>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="p-4">
+                              <p className="text-sm text-neutral-500 flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-success-500" />
+                                无温度异常
+                              </p>
+                            </div>
+                          )
                         )}
                       </div>
                     );

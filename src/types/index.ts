@@ -244,6 +244,7 @@ export interface AppState {
   updateDisputeTicket: (id: string, updates: Partial<DisputeTicket>) => void;
   changeTicketStatus: (id: string, newStatus: TicketStatus, remark?: string) => void;
   addTicketRemark: (id: string, content: string) => void;
+  addTicketMaterial: (ticketId: string, fileName: string, fileUrl?: string) => void;
   getFilteredTickets: () => DisputeTicket[];
   saveCertificateVersion: (purpose: VersionPurpose, customNote?: string) => void;
   getVersionsByWaybillId: (waybillId: string) => CertificateVersion[];

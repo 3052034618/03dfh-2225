@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   X,
   FileText,
@@ -13,6 +13,7 @@ import {
   Tag,
   CheckCircle2,
   Send,
+  Upload,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
@@ -68,31 +69,55 @@ const logIconConfig: Record<TicketLogType, { icon: React.ReactNode; color: strin
 };
 
 export const TicketDetailModal = ({ isOpen, onClose, ticket }: TicketDetailModalProps) => {
+  const disputeTickets = useAppStore((state) => state.disputeTickets);
   const changeTicketStatus = useAppStore((state) => state.changeTicketStatus);
   const addTicketRemark = useAppStore((state) => state.addTicketRemark);
+  const addTicketMaterial = useAppStore((state) => state.addTicketMaterial);
+
+  const currentTicket = useMemo(
+    () => disputeTickets.find((t) => t.id === ticket.id),
+    [disputeTickets, ticket.id]
+  );
 
   const [remarkContent, setRemarkContent] = useState('');
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setRemarkContent('');
+      setUploadSuccess(false);
     }
   }, [isOpen]);
 
   const handleStatusChange = (newStatus: TicketStatus) => {
-    changeTicketStatus(ticket.id, newStatus);
+    if (!currentTicket) return;
+    changeTicketStatus(currentTicket.id, newStatus);
   };
 
   const handleAddRemark = () => {
+    if (!currentTicket) return;
     const content = remarkContent.trim();
     if (!content) return;
-    addTicketRemark(ticket.id, content);
+    addTicketRemark(currentTicket.id, content);
     setRemarkContent('');
   };
 
-  if (!isOpen) return null;
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!currentTicket) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+    addTicketMaterial(currentTicket.id, file.name);
+    setUploadSuccess(true);
+    setTimeout(() => setUploadSuccess(false), 2000);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
-  const sortedLogs = [...ticket.activityLogs].sort(
+  if (!isOpen || !currentTicket) return null;
+
+  const sortedLogs = [...currentTicket.activityLogs].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
 
@@ -112,12 +137,12 @@ export const TicketDetailModal = ({ isOpen, onClose, ticket }: TicketDetailModal
               <h3 className="text-lg font-semibold text-neutral-900">
                 工单详情
               </h3>
-              <span className="font-mono text-sm text-neutral-500">#{ticket.id}</span>
-              <span className={getTicketStatusBadgeClass(ticket.status)}>
-                {formatTicketStatus(ticket.status)}
+              <span className="font-mono text-sm text-neutral-500">#{currentTicket.id}</span>
+              <span className={getTicketStatusBadgeClass(currentTicket.status)}>
+                {formatTicketStatus(currentTicket.status)}
               </span>
-              <span className={getTicketPriorityBadgeClass(ticket.priority)}>
-                {formatTicketPriority(ticket.priority)}优先级
+              <span className={getTicketPriorityBadgeClass(currentTicket.priority)}>
+                {formatTicketPriority(currentTicket.priority)}优先级
               </span>
             </div>
           </div>
@@ -137,7 +162,7 @@ export const TicketDetailModal = ({ isOpen, onClose, ticket }: TicketDetailModal
               <div className="bg-neutral-50 rounded-xl p-5 space-y-4">
                 <div>
                   <h5 className="text-lg font-semibold text-neutral-900 mb-2">
-                    {ticket.title}
+                    {currentTicket.title}
                   </h5>
                 </div>
 
@@ -146,54 +171,54 @@ export const TicketDetailModal = ({ isOpen, onClose, ticket }: TicketDetailModal
                     <User className="w-4 h-4 text-neutral-400" />
                     <span className="text-sm text-neutral-500">客户：</span>
                     <span className="text-sm font-medium text-neutral-800">
-                      {ticket.customerName}
+                      {currentTicket.customerName}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4 text-neutral-400" />
                     <span className="text-sm text-neutral-500">运单号：</span>
                     <Link
-                      to={`/trace/${ticket.waybillId}`}
+                      to={`/trace/${currentTicket.waybillId}`}
                       className="text-sm font-mono font-medium text-primary-600 hover:text-primary-700 hover:underline"
                     >
-                      {ticket.waybillIdDisplay}
+                      {currentTicket.waybillIdDisplay}
                     </Link>
                   </div>
                   <div className="flex items-center gap-2">
                     <UserCheck className="w-4 h-4 text-neutral-400" />
                     <span className="text-sm text-neutral-500">负责人：</span>
                     <span className="text-sm font-medium text-neutral-800">
-                      {ticket.assignee}
+                      {currentTicket.assignee}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-neutral-400" />
                     <span className="text-sm text-neutral-500">风险等级：</span>
-                    <span className={getRiskLevelBadgeClass(ticket.riskLevel)}>
-                      {formatRiskLevel(ticket.riskLevel)}
+                    <span className={getRiskLevelBadgeClass(currentTicket.riskLevel)}>
+                      {formatRiskLevel(currentTicket.riskLevel)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-neutral-400" />
                     <span className="text-sm text-neutral-500">创建时间：</span>
                     <span className="text-sm text-neutral-700">
-                      {formatDateTime(ticket.createdAt)}
+                      {formatDateTime(currentTicket.createdAt)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Repeat className="w-4 h-4 text-neutral-400" />
                     <span className="text-sm text-neutral-500">最近更新：</span>
                     <span className="text-sm text-neutral-700">
-                      {formatDateTime(ticket.updatedAt)}
+                      {formatDateTime(currentTicket.updatedAt)}
                     </span>
                   </div>
                 </div>
 
-                {ticket.tags.length > 0 && (
+                {currentTicket.tags.length > 0 && (
                   <div className="flex items-start gap-2">
                     <Tag className="w-4 h-4 text-neutral-400 mt-0.5" />
                     <div className="flex flex-wrap gap-1.5">
-                      {ticket.tags.map((tag) => (
+                      {currentTicket.tags.map((tag) => (
                         <span
                           key={tag}
                           className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-100"
@@ -208,7 +233,7 @@ export const TicketDetailModal = ({ isOpen, onClose, ticket }: TicketDetailModal
                 <div className="pt-3 border-t border-neutral-200">
                   <p className="text-sm text-neutral-500 mb-1.5">问题描述</p>
                   <p className="text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap">
-                    {ticket.description}
+                    {currentTicket.description}
                   </p>
                 </div>
               </div>
@@ -218,7 +243,7 @@ export const TicketDetailModal = ({ isOpen, onClose, ticket }: TicketDetailModal
               <h4 className="text-base font-semibold text-neutral-800">状态流转</h4>
               <div className="flex flex-wrap gap-2">
                 {statusOptions.map((option) => {
-                  const isActive = ticket.status === option.value;
+                  const isActive = currentTicket.status === option.value;
                   let activeClass = '';
                   if (isActive) {
                     if (option.value === 'pending') {
@@ -317,19 +342,51 @@ export const TicketDetailModal = ({ isOpen, onClose, ticket }: TicketDetailModal
               </div>
             </div>
 
-            {ticket.resolution && (
+            {currentTicket.resolution && (
               <div className="space-y-3">
                 <h4 className="text-base font-semibold text-neutral-800">解决方案</h4>
                 <div className="bg-success-50 border border-success-200 rounded-xl p-4">
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="w-5 h-5 text-success-600 mt-0.5 flex-shrink-0" />
                     <p className="text-sm text-success-800 leading-relaxed whitespace-pre-wrap">
-                      {ticket.resolution}
+                      {currentTicket.resolution}
                     </p>
                   </div>
                 </div>
               </div>
             )}
+
+            <div className="space-y-3">
+              <h4 className="text-base font-semibold text-neutral-800">上传证明材料</h4>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+              />
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="btn-secondary"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    上传证明材料
+                  </button>
+                  {uploadSuccess && (
+                    <span className="text-sm text-success-600 inline-flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4" />
+                      上传成功
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-neutral-500">
+                  支持 PDF、PNG、JPG、JPEG 格式，用于上传相关证明文件、照片等材料
+                </p>
+              </div>
+            </div>
 
             <div className="space-y-3">
               <h4 className="text-base font-semibold text-neutral-800">添加备注</h4>

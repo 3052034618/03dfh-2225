@@ -23,6 +23,7 @@ import {
 } from '@/data/mockTickets';
 import { formatDateTime } from '@/utils/format';
 import { generateCustomerSummary } from '@/utils/summary';
+import { loadTickets, saveTickets, loadVersions, saveVersions } from '@/utils/persist';
 
 const generateCertificateSegments = (waybillId: string): CertificateSegment[] => {
   const events = getEventsByWaybillId(waybillId);
@@ -82,6 +83,16 @@ const generateCertificateSegments = (waybillId: string): CertificateSegment[] =>
   return segments;
 };
 
+const initializeTickets = (): DisputeTicket[] => {
+  const stored = loadTickets();
+  return stored && Array.isArray(stored) && stored.length > 0 ? stored : mockTickets;
+};
+
+const initializeVersions = (): CertificateVersion[] => {
+  const stored = loadVersions();
+  return stored && Array.isArray(stored) && stored.length > 0 ? stored : mockVersions;
+};
+
 export const useAppStore = create<AppState>((set, get) => ({
   waybills: mockWaybills,
   selectedWaybill: null,
@@ -94,8 +105,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedTimelineEventId: null,
   certificateSegments: [],
   customerSummary: null,
-  disputeTickets: mockTickets,
-  certificateVersions: mockVersions,
+  disputeTickets: initializeTickets(),
+  certificateVersions: initializeVersions(),
   customerSummaries: mockCustomerSummaries,
   explainPackages: mockExplainPackages,
   selectedTicketId: null,
@@ -304,17 +315,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       updatedAt: now,
       activityLogs: [creationLog],
     };
-    set((state) => ({
-      disputeTickets: [newTicket, ...state.disputeTickets],
-    }));
+    set((state) => {
+      const newTickets = [newTicket, ...state.disputeTickets];
+      saveTickets(newTickets);
+      return { disputeTickets: newTickets };
+    });
   },
 
   updateDisputeTicket: (id: string, updates: Partial<DisputeTicket>) => {
-    set((state) => ({
-      disputeTickets: state.disputeTickets.map((t) =>
+    set((state) => {
+      const newTickets = state.disputeTickets.map((t) =>
         t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
-      ),
-    }));
+      );
+      saveTickets(newTickets);
+      return { disputeTickets: newTickets };
+    });
   },
 
   getFilteredTickets: () => {
@@ -357,9 +372,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       summarySnapshot: JSON.parse(JSON.stringify(customerSummary)),
     };
 
-    set((state) => ({
-      certificateVersions: [newVersion, ...state.certificateVersions],
-    }));
+    set((state) => {
+      const newVersions = [newVersion, ...state.certificateVersions];
+      saveVersions(newVersions);
+      return { certificateVersions: newVersions };
+    });
   },
 
   getVersionsByWaybillId: (waybillId: string) => {
@@ -388,8 +405,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   changeTicketStatus: (id: string, newStatus: TicketStatus, remark?: string) => {
     const now = new Date().toISOString();
-    set((state) => ({
-      disputeTickets: state.disputeTickets.map((t) => {
+    set((state) => {
+      const newTickets = state.disputeTickets.map((t) => {
         if (t.id === id) {
           const newLog: TicketActivityLog = {
             id: `L${Date.now()}`,
@@ -409,14 +426,16 @@ export const useAppStore = create<AppState>((set, get) => ({
           };
         }
         return t;
-      }),
-    }));
+      });
+      saveTickets(newTickets);
+      return { disputeTickets: newTickets };
+    });
   },
 
   addTicketRemark: (id: string, content: string) => {
     const now = new Date().toISOString();
-    set((state) => ({
-      disputeTickets: state.disputeTickets.map((t) => {
+    set((state) => {
+      const newTickets = state.disputeTickets.map((t) => {
         if (t.id === id) {
           const newLog: TicketActivityLog = {
             id: `L${Date.now()}`,
@@ -433,26 +452,67 @@ export const useAppStore = create<AppState>((set, get) => ({
           };
         }
         return t;
-      }),
-    }));
+      });
+      saveTickets(newTickets);
+      return { disputeTickets: newTickets };
+    });
+  },
+
+  addTicketMaterial: (ticketId: string, fileName: string, fileUrl?: string) => {
+    const now = new Date().toISOString();
+    set((state) => {
+      const newTickets = state.disputeTickets.map((t) => {
+        if (t.id === ticketId) {
+          const newLog: TicketActivityLog = {
+            id: `L${Date.now()}`,
+            ticketId,
+            type: 'material',
+            timestamp: now,
+            operator: '当前客服',
+            fileName,
+            fileUrl,
+          };
+          return {
+            ...t,
+            updatedAt: now,
+            activityLogs: [...t.activityLogs, newLog],
+          };
+        }
+        return t;
+      });
+      saveTickets(newTickets);
+      return { disputeTickets: newTickets };
+    });
   },
 
   generateCustomerExplainPackage: (customerName: string, selectedWaybillIds?: string[]): CustomerExplainPackage => {
     const { waybills } = get();
+
+    const allCustomerWaybillIds = waybills
+      .filter((w) => w.customerName === customerName)
+      .map((w) => w.id);
+
     const targetIds = selectedWaybillIds && selectedWaybillIds.length > 0
       ? selectedWaybillIds
-      : waybills.filter((w) => w.customerName === customerName).map((w) => w.id);
+      : allCustomerWaybillIds;
 
-    const selectedWaybills = waybills.filter((w) => targetIds.includes(w.id));
+    const validWaybills = targetIds
+      .map((id) => waybills.find((w) => w.id === id))
+      .filter((w): w is Waybill => w !== undefined);
 
-    const totalAlerts = selectedWaybills.reduce((sum, w) => sum + w.alertCount, 0);
-    const severeAlerts = selectedWaybills.filter((w) => w.riskLevel === 'severe').length;
-    const minorAlerts = selectedWaybills.filter((w) => w.riskLevel === 'minor').length;
-    const avgComplianceRate = selectedWaybills.length > 0
-      ? selectedWaybills.reduce((sum, w) => sum + w.complianceRate, 0) / selectedWaybills.length
+    const validWaybillIds = validWaybills.map((w) => w.id);
+
+    const severeAlerts = validWaybills.reduce((sum, w) => {
+      return sum + (w.riskLevel === 'severe' ? w.alertCount : 0);
+    }, 0);
+    const minorAlerts = validWaybills.reduce((sum, w) => {
+      return sum + (w.riskLevel === 'minor' ? w.alertCount : 0);
+    }, 0);
+    const avgComplianceRate = validWaybills.length > 0
+      ? validWaybills.reduce((sum, w) => sum + w.complianceRate, 0) / validWaybills.length
       : 100;
 
-    const waybillSummaries = selectedWaybills.map((w) => {
+    const waybillSummaries = validWaybills.map((w) => {
       const alerts = getAlertRecordsByWaybillId(w.id);
       const actions = getHandlingActionsByWaybillId(w.id);
       return {
@@ -478,11 +538,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     });
 
+    const validatedTotalAlerts = waybillSummaries.reduce((sum, s) => sum + s.alerts, 0);
+
     let conclusion = '';
-    if (totalAlerts === 0) {
-      conclusion = `尊敬的${customerName}客户，您好！经核查，贵司近期${selectedWaybills.length}单运输全程温度合规，未触发任何温度报警，冷链温控记录完整，货物运输品质有保障。`;
+    if (validatedTotalAlerts === 0) {
+      conclusion = `尊敬的${customerName}客户，您好！经核查，贵司近期${validWaybills.length}单运输全程温度合规，未触发任何温度报警，冷链温控记录完整，货物运输品质有保障。`;
     } else {
-      conclusion = `尊敬的${customerName}客户，您好！针对贵司关注的${selectedWaybills.length}单运输，共记录${totalAlerts}次温度异常（严重${severeAlerts}次、轻微${minorAlerts}次），平均合规率${avgComplianceRate.toFixed(1)}%。我司已针对每次异常均已第一时间跟进处置，货物品质未受影响，相关处理措施及详情见下文说明。`;
+      conclusion = `尊敬的${customerName}客户，您好！针对贵司关注的${validWaybills.length}单运输，共记录${validatedTotalAlerts}次温度异常（严重${severeAlerts}次、轻微${minorAlerts}次），平均合规率${avgComplianceRate.toFixed(1)}%。我司已针对每次异常均已第一时间跟进处置，货物品质未受影响，相关处理措施及详情见下文说明。`;
     }
 
     const newPackage = {
@@ -490,8 +552,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       customerName,
       createdAt: new Date().toISOString(),
       createdBy: '当前客服',
-      waybillIds: targetIds,
-      totalAlerts,
+      waybillIds: validWaybillIds,
+      totalAlerts: validatedTotalAlerts,
       severeAlerts,
       minorAlerts,
       avgComplianceRate,
